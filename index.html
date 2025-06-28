@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo & Signature Upload Validator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    .message { margin-top: 15px; font-weight: bold; }
+    .error { color: red; }
+    .success { color: green; }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+  <h2>Upload Your Passport Size Photo or Signature</h2>
+
+  <label>Student Name:</label><br>
+  <input type="text" id="studentName" placeholder="Enter student name"><br><br>
+
+  <label>Select Image Type:</label><br>
+  <select id="imageType">
+    <option value="PassportSizePhoto">Passport Size Photo</option>
+    <option value="Signature">Signature</option>
+  </select><br><br>
+
+  <label>Select Image File (JPG, JPEG, PNG):</label><br>
+  <input type="file" id="photoInput" accept=".jpg, .jpeg, .png"><br>
+
+  <div class="message" id="message"></div>
+  <a id="downloadLink" style="display:none;">Download Processed Image</a>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    document.getElementById('photoInput').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      const studentName = document.getElementById('studentName').value.trim().replace(/\s+/g, '_');
+      const imageType = document.getElementById('imageType').value;
+      const messageDiv = document.getElementById('message');
+      const downloadLink = document.getElementById('downloadLink');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      messageDiv.textContent = '';
+      messageDiv.className = 'message';
+      downloadLink.style.display = 'none';
+
+      if (!file) return;
+
+      if (studentName === '') {
+        messageDiv.textContent = 'Error: Please enter the student name.';
+        messageDiv.classList.add('error');
+        return;
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        messageDiv.textContent = 'Error: Please upload a JPG, JPEG, or PNG image.';
+        messageDiv.classList.add('error');
+        return;
+      }
+
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        img.src = e.target.result;
+      };
+
+      img.onload = function() {
+        let targetWidth, targetHeight;
+
+        if (imageType === 'PassportSizePhoto') {
+          targetWidth = 413; // ~3.5cm at 300 DPI
+          targetHeight = 531; // ~4.5cm at 300 DPI
+        } else {
+          targetWidth = 413; // Example width for Signature
+          targetHeight = 200; // Example height for Signature (adjust if needed)
+        }
+
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+        let quality = 0.9;
+
+        function compressAndCheck() {
+          canvas.toBlob(function(blob) {
+            const fileSizeKB = blob.size / 1024;
+
+            if (fileSizeKB > 100 && quality > 0.1) {
+              quality -= 0.05;
+              compressAndCheck();
+            } else if (fileSizeKB < 4) {
+              messageDiv.textContent = `Warning: Final image is too small (${Math.round(fileSizeKB)} KB). Please upload a higher resolution source image.`;
+              messageDiv.classList.add('error');
+            } else {
+              const url = URL.createObjectURL(blob);
+              const filename = `${studentName}_${imageType}.jpg`;
+
+              downloadLink.href = url;
+              downloadLink.download = filename;
+              downloadLink.textContent = `Download Processed Image (${filename}, ${Math.round(fileSizeKB)} KB)`;
+              downloadLink.style.display = 'inline-block';
+              messageDiv.textContent = 'Success: Image resized, compressed, and ready for download.';
+              messageDiv.classList.add('success');
+            }
+          }, 'image/jpeg', quality);
+        }
+
+        compressAndCheck();
+      };
+
+      reader.readAsDataURL(file);
+    });
+  </script>
+
+</body>
+</html>
